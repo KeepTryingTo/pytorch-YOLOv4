@@ -499,7 +499,6 @@ def evaluate(model, data_loader, cfg, device, logger=None, **kwargs):
             img_height, img_width = img.shape[:2]
             # boxes = output[...,:4].copy()  # output boxes in yolo format
             boxes = boxes.squeeze(2).cpu().detach().numpy()
-            boxes[...,2:] = boxes[...,2:] - boxes[...,:2] # Transform [x1, y1, x2, y2] to [x1, y1, w, h]
             boxes[...,0] = boxes[...,0]*img_width
             boxes[...,1] = boxes[...,1]*img_height
             boxes[...,2] = boxes[...,2]*img_width
@@ -515,6 +514,7 @@ def evaluate(model, data_loader, cfg, device, logger=None, **kwargs):
             # TODO NMS
             # print('boxes.shape: {}'.format(boxes.size()))
             # print('scores.shape: {}'.format(scores.size()))
+            from torchvision.ops import nms
             keep = nms(boxes=boxes.squeeze(), scores=scores, iou_threshold=0.5)
             boxes = boxes[keep]
             scores = scores[keep]
@@ -525,6 +525,8 @@ def evaluate(model, data_loader, cfg, device, logger=None, **kwargs):
             boxes = boxes[mask]
             scores = scores[mask]
             labels = labels[mask]
+
+            boxes[..., 2:] = boxes[..., 2:] - boxes[..., :2]  # Transform [x1, y1, x2, y2] to [x1, y1, w, h]
 
             res[target["image_id"].item()] = {
                 "boxes": boxes,
