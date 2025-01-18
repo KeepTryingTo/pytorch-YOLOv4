@@ -37,6 +37,8 @@ from tool.tv_reference.utils import collate_fn as val_collate
 from tool.tv_reference.coco_utils import convert_to_coco_api
 from tool.tv_reference.coco_eval import CocoEvaluator
 
+from torchvision.ops import nms
+
 
 def bboxes_iou(bboxes_a, bboxes_b, xyxy=True, GIoU=False, DIoU=False, CIoU=False):
     """Calculate the Intersection of Unions (IoUs) between bounding boxes.
@@ -128,11 +130,11 @@ def bboxes_iou(bboxes_a, bboxes_b, xyxy=True, GIoU=False, DIoU=False, CIoU=False
 
 
 class Yolo_loss(nn.Module):
-    def __init__(self, n_classes=80, n_anchors=3, device=None, batch=2):
+    def __init__(self, n_classes=80, img_size = 608, n_anchors=3, device=None, batch=2):
         super(Yolo_loss, self).__init__()
         self.device = device
         self.strides = [8, 16, 32]
-        image_size = 608
+        self.image_size = img_size
         self.n_classes = n_classes
         self.n_anchors = n_anchors
 
@@ -149,7 +151,7 @@ class Yolo_loss(nn.Module):
             ref_anchors[:, 2:] = np.array(all_anchors_grid, dtype=np.float32)
             ref_anchors = torch.from_numpy(ref_anchors)
             # calculate pred - xywh obj cls
-            fsize = image_size // self.strides[i]
+            fsize = self.image_size // self.strides[i]
             grid_x = torch.arange(fsize, dtype=torch.float).repeat(batch, 3, fsize, 1).to(device)
             grid_y = torch.arange(fsize, dtype=torch.float).repeat(batch, 3, fsize, 1).permute(0, 1, 3, 2).to(device)
             anchor_w = torch.from_numpy(masked_anchors[:, 0]).repeat(batch, fsize, fsize, 1).permute(0, 3, 1, 2).to(
@@ -354,7 +356,7 @@ def train(model, device, config, epochs=5, batch_size=1, save_cp=True, log_step=
         )
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, burnin_schedule)
 
-    criterion = Yolo_loss(device=device, batch=config.batch // config.subdivisions, n_classes=config.classes)
+    criterion = Yolo_loss(device=device,img_size=config.width, batch=config.batch // config.subdivisions, n_classes=config.classes)
     # scheduler = ReduceLROnPlateau(optimizer, mode='max', verbose=True, patience=6, min_lr=1e-7)
     # scheduler = CosineAnnealingWarmRestarts(optimizer, 0.001, 1e-6, 20)
 
@@ -448,7 +450,7 @@ def train(model, device, config, epochs=5, batch_size=1, save_cp=True, log_step=
                     pass
                 save_path = os.path.join(config.checkpoints, f'{save_prefix}{epoch + 1}.pth')
                 if isinstance(model, torch.nn.DataParallel):
-                    torch.save(model.moduel,state_dict(), save_path)
+                    torch.save(model.moduel.state_dict(), save_path)
                 else:
                     torch.save(model.state_dict(), save_path)
                 logging.info(f'Checkpoint {epoch + 1} saved !')
@@ -509,6 +511,21 @@ def evaluate(model, data_loader, cfg, device, logger=None, **kwargs):
             labels = torch.as_tensor(labels, dtype=torch.int64)
             scores = np.max(confs, axis=1).flatten()
             scores = torch.as_tensor(scores, dtype=torch.float32)
+
+            # TODO NMS
+            # print('boxes.shape: {}'.format(boxes.size()))
+            # print('scores.shape: {}'.format(scores.size()))
+            keep = nms(boxes=boxes.squeeze(), scores=scores, iou_threshold=0.5)
+            boxes = boxes[keep]
+            scores = scores[keep]
+            labels = labels[keep]
+
+            # TODO filte lower confidence
+            mask = scores > 0.5
+            boxes = boxes[mask]
+            scores = scores[mask]
+            labels = labels[mask]
+
             res[target["image_id"].item()] = {
                 "boxes": boxes,
                 "scores": scores,

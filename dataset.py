@@ -137,7 +137,7 @@ def image_data_augmentation(mat, w, h, pleft, ptop, swidth, sheight, flip, dhue,
         if dsat != 1 or dexp != 1 or dhue != 0:
             if img.shape[2] >= 3:
                 hsv_src = cv2.cvtColor(sized.astype(np.float32), cv2.COLOR_RGB2HSV)  # RGB to HSV
-                hsv = cv2.split(hsv_src)
+                hsv = list(cv2.split(hsv_src))
                 hsv[1] *= dsat
                 hsv[2] *= dexp
                 hsv[0] += 179 * dhue
@@ -431,8 +431,8 @@ def get_image_id(filename:str) -> int:
 
     print("You could also create your own 'get_image_id' function.")
     # print(filename)
-    parts = filename.split('/')
-    id = int(parts[-1][0:-4])
+    parts = filename.split('/')[-1].split('_')[-1]
+    id = int(parts[0:-4])
     # print(id)
     return id
 

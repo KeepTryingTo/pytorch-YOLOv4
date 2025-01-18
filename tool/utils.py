@@ -137,10 +137,13 @@ def plot_boxes_cv2(img, boxes, savename=None, class_names=None, color=None):
             t_size = cv2.getTextSize(msg, 0, 0.7, thickness=bbox_thick // 2)[0]
             c1, c2 = (x1,y1), (x2, y2)
             c3 = (c1[0] + t_size[0], c1[1] - t_size[1] - 3)
-            cv2.rectangle(img, (x1,y1), (np.float32(c3[0]), np.float32(c3[1])), rgb, -1)
-            img = cv2.putText(img, msg, (c1[0], np.float32(c1[1] - 2)), cv2.FONT_HERSHEY_SIMPLEX,0.7, (0,0,0), bbox_thick//2,lineType=cv2.LINE_AA)
+            cv2.rectangle(img, (int(x1),int(y1)),
+                          (int(np.float32(c3[0])), int(np.float32(c3[1]))), rgb, -1)
+            img = cv2.putText(img, msg, (int(c1[0]), int(np.float32(c1[1] - 2))),
+                              cv2.FONT_HERSHEY_SIMPLEX,0.7, (0,0,0),
+                              bbox_thick//2,lineType=cv2.LINE_AA)
         
-        img = cv2.rectangle(img, (x1, y1), (x2, y2), rgb, bbox_thick)
+        img = cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), rgb, bbox_thick)
     if savename:
         print("save plot results to %s" % savename)
         cv2.imwrite(savename, img)
